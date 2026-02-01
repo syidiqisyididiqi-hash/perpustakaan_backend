@@ -39,7 +39,7 @@ class FineController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil ditambahkan',
-            'data' => $fine->load('loan')
+            'data' => $fine->load(['loan'])
         ], 201);
     }
 
