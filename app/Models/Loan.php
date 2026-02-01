@@ -16,8 +16,29 @@ class Loan extends Model
         'status'
     ];
 
+    protected $casts = [
+        'loan_date' => 'date',
+        'due_date' => 'date',
+        'return_date' => 'date',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function isOverdue(): bool
+    {
+        return is_null($this->return_date) && now()->gt($this->due_date);
+    }
+
+    public function scopeBorrowed($query)
+    {
+        return $query->where('status', 'borrowed');
+    }
+
+    public function scopeReturned($query)
+    {
+        return $query->where('status', 'returned');
     }
 }
