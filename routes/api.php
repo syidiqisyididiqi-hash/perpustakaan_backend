@@ -1,18 +1,33 @@
 <?php
 
-use App\Http\Controllers\BookController;
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\ApiAuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\BookController;
 use App\Http\Controllers\FineController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanDetailController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\UserController;
 
-Route::apiResource('category', CategoryController::class);
+Route::prefix('auth')->group(function () {
+    Route::post('register', [ApiAuthController::class, 'register']);
+    Route::post('login', [ApiAuthController::class, 'login']);
+    Route::post('logout', [ApiAuthController::class, 'logout'])->middleware('auth:sanctum');
+});
 
-Route::apiResource('book', BookController::class);
+Route::get('health', function () {
+    return response()->json([
+        'status' => true,
+        'message' => 'API up'
+    ], 200);
+});
 
-Route::apiResource('fine', FineController::class);
+Route::middleware('auth:sanctum')->group(function () {
 
-Route::apiResource('loan', LoanController::class);
-
-Route::apiResource('loandetail', LoanDetailController::class);
+    Route::apiResource('users', UserController::class);
+    Route::apiResource('categories', CategoryController::class);
+    Route::apiResource('books', BookController::class);
+    Route::apiResource('fines', FineController::class);
+    Route::apiResource('loans', LoanController::class);
+    Route::apiResource('loan-details', LoanDetailController::class);
+});
