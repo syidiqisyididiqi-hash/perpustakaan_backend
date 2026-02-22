@@ -43,31 +43,31 @@ class CategoryController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(Category $categori)
+    public function show(Category $category)
     {
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => $categori
+            'data' => $category
         ], 200);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Category $categori)
+    public function update(Request $request, Category $category)
     {
         $validated = $request->validate([
             'name' => 'sometimes|string|max:100',
             'description' => 'nullable|string'
         ]);
 
-        $categori->update($validated);
+        $category->update($validated);
 
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diperbarui',
-            'data' => $categori
+            'data' => $category
         ], 200);
 
     }
@@ -75,14 +75,14 @@ class CategoryController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Category $categori)
+    public function destroy(Category $category)
     {
-        $categori->delete();
+        $category->delete();
 
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil dihapus',
-            'data' => $categori
+            'data' => $category
         ], 200);
     }
 }
