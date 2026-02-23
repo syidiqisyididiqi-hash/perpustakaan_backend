@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Book;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -36,8 +37,13 @@ class BookController extends Controller
             'published_year' => 'required|integer',
             'stock' => 'required|integer|min:0',
             'rack_code' => 'required|string|max:20',
-            'cover' => 'nullable|string'
+            'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
         ]);
+
+        if ($request->hasFile('cover')) {
+            $validated['cover'] = $request->file('cover')->store('covers', 'public');
+        }
+
 
         $book = Book::create($validated);
 
@@ -88,8 +94,16 @@ class BookController extends Controller
             'published_year' => 'sometimes|integer',
             'stock' => 'sometimes|integer|min:0',
             'rack_code' => 'sometimes|string|max:20',
-            'cover' => 'nullable|string'
+            'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
         ]);
+
+        if ($request->hasFile('cover')) {
+            if ($book->cover) {
+                Storage::disk('public')->delete($book->cover);
+            }
+
+            $validated['cover'] = $request->file('cover')->store('covers', 'public');
+        }
 
         $book->update($validated);
 
@@ -105,6 +119,10 @@ class BookController extends Controller
      */
     public function destroy(Book $book)
     {
+        if ($book->cover) {
+            Storage::disk('public')->delete($book->cover);
+        }
+
         $book->delete();
 
         return response()->json([
