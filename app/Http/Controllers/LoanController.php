@@ -77,14 +77,18 @@ class LoanController extends Controller
     public function update(Request $request, Loan $loan)
     {
         $validated = $request->validate([
-
             'loan_date' => 'sometimes|date',
             'due_date' => 'sometimes|date|after_or_equal:loan_date',
-            'return_date' => 'nullable|date|after_or_equal:loan_date'
+            'return_date' => 'nullable|date|after_or_equal:loan_date',
+            'status' => 'sometimes|string'
         ]);
 
-        if (!empty($validated['return_date'])) {
-            $validated['status'] = 'returned';
+        if ($request->has('return_date')) {
+            if ($request->return_date) {
+                $validated['status'] = 'returned';
+            } else {
+                $validated['status'] = 'borrowed';
+            }
         }
 
         $loan->update($validated);
