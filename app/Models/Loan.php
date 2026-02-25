@@ -41,4 +41,8 @@ class Loan extends Model
     {
         return $query->where('status', 'returned');
     }
+    public function loanDetails()
+    {
+        return $this->hasMany(LoanDetail::class);
+    }
 }

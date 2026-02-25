@@ -18,10 +18,43 @@ class BookController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => Book::with(['category'])->latest()->get()
+            'data' => Book::with('category')
+                ->select(
+                    'id',
+                    'category_id',
+                    'isbn',
+                    'title',
+                    'author',
+                    'publisher',
+                    'published_year',
+                    'stock',
+                    'rack_code',
+                    'cover',
+                    'created_at'
+                )
+                ->latest()
+                ->get()
         ], 200);
     }
 
+    /**
+     * Dropdown data for books with stock > 0
+     */
+    public function dropdown()
+    {
+        return response()->json([
+            'status' => true,
+            'data' => Book::select(
+                'id',
+                'title',
+                'rack_code',
+                'stock'
+            )
+                ->where('stock', '>', 0)
+                ->orderBy('title')
+                ->get()
+        ]);
+    }
 
     /**
      * Store a newly created resource in storage.

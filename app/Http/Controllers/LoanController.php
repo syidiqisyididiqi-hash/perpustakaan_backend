@@ -16,7 +16,7 @@ class LoanController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => Loan::with(['user'])->latest()->get()
+            'data' => Loan::with(['user', 'loanDetails.book'])->latest()->get()
         ], 200);
     }
 
@@ -41,13 +41,16 @@ class LoanController extends Controller
         ]);
 
         $validated['status'] = 'borrowed';
-
         $loan = Loan::create($validated);
+
+        foreach ($request->details as $detail) {
+            $loan->loanDetails()->create($detail);
+        }
 
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil ditambahkan',
-            'data' => $loan->load(['user'])
+            'data' => $loan->load(['user', 'loanDetails.book'])
         ], 201);
     }
 
@@ -59,7 +62,7 @@ class LoanController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => $loan->load(['user'])
+            'data' => $loan->load(['user', 'loanDetails.book'])
         ], 200);
     }
 
@@ -96,7 +99,7 @@ class LoanController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diupdate',
-            'data' => $loan->load(['user'])
+            'data' => $loan->load(['user', 'loanDetails.book'])
         ], 200);
     }
 
