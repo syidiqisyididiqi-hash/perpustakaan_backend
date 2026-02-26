@@ -19,4 +19,20 @@ class Fine extends Model
     {
         return $this->belongsTo(Loan::class);
     }
+
+    public function getRackCodeAttribute($value)
+    {
+        if ($value)
+            return $value;
+
+        return $this->loan?->loanDetails?->first()?->book?->rack_code ?? '-';
+    }
+
+    public function getTotalFineAttribute($value)
+    {
+        if ($value)
+            return $value;
+
+        return $this->overdue_days * 5000;
+    }
 }

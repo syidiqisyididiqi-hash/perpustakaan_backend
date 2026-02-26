@@ -28,19 +28,40 @@ class FineController extends Controller
     {
         $validated = $request->validate([
             'loan_id' => 'required|exists:loans,id',
-            'rack_code' => 'required|string',
-            'overdue_days' => 'required|integer',
-            'total_fine' => 'required|numeric|min:0',
+            'overdue_days' => 'required|integer|min:0',
             'status' => 'required|in:paid,unpaid',
+            'total_fine' => 'nullable|numeric'
         ]);
 
-        $fine = Fine::create($validated);
+        $loan = \App\Models\Loan::with('loanDetails.book')->findOrFail($validated['loan_id']);
+
+        $rackCode = $loan->loanDetails->first()?->book?->rack_code ?? '-';
+
+        $amount = $validated['total_fine'] ?? 0;
+
+        if (!$amount) {
+            $today = now();
+            $returnDate = \Carbon\Carbon::parse($loan->return_date);
+
+            if ($today->greaterThan($returnDate)) {
+                $daysLate = $returnDate->diffInDays($today);
+                $amount = $daysLate * 5000;
+            }
+        }
+
+        $fine = \App\Models\Fine::create([
+            'loan_id' => $validated['loan_id'],
+            'rack_code' => $rackCode,
+            'overdue_days' => $validated['overdue_days'],
+            'total_fine' => $amount,
+            'status' => $validated['status'],
+        ]);
 
         return response()->json([
             'status' => true,
-            'message' => 'Data berhasil ditambahkan',
-            'data' => $fine->load(['loan'])
-        ], 201);
+            'message' => 'Denda berhasil dibuat',
+            'data' => $fine->load('loan.user')
+        ]);
     }
 
     /**
@@ -62,14 +83,14 @@ class FineController extends Controller
     public function update(Request $request, Fine $fine)
     {
         $validated = $request->validate([
-            'loan_id' => 'required|exists:loans,id',
-            'rack_code' => 'required|string',
-            'overdue_days' => 'required|integer',
-            'total_fine' => 'required|numeric|min:0',
-            'status' => 'required|in:paid,unpaid',
+            'overdue_days' => 'sometimes|integer|min:1',
+            'status' => 'sometimes|in:paid,unpaid',
         ]);
 
-        $fine->update($validated);
+        $fine->update([
+            'overdue_days' => $validated['overdue_days'],
+            'status' => $validated['status'],
+        ]);
 
         return response()->json([
             'status' => true,
