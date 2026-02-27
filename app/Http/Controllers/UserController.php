@@ -26,14 +26,14 @@ class UserController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'role' => 'required|in:admin,staff,member',
-            'member_number' => 'nullable|string|max:50|unique:users',
+            'role' => 'required|in:admin,member',
+            'member_number' => 'nullable|string|max:50|unique:users,member_number',
             'name' => 'required|string|max:100',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
-            'email' => 'required|email|max:100|unique:users',
-            'password' => 'required|min:6',
-            'status' => 'required|in:active,inactive'
+            'email' => 'required|email|max:100|unique:users,email',
+            'password' => 'required|string|min:6',
+            'status' => 'nullable|in:active,inactive'
         ]);
 
         $validated['password'] = Hash::make($validated['password']);
@@ -65,14 +65,14 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
-            'role' => 'sometimes|in:admin,staff,member',
+            'role' => 'sometimes|in:admin,member',
             'member_number' => 'nullable|string|max:50|unique:users,member_number,' . $user->id,
             'name' => 'sometimes|string|max:100',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
             'email' => 'sometimes|email|max:100|unique:users,email,' . $user->id,
-            'password' => 'nullable|min:6',
-            'status' => 'sometimes|in:active,inactive'
+            'password' => 'nullable|string|min:6',
+            'status' => 'nullable|in:active,inactive'
         ]);
 
         if ($request->filled('password')) {
@@ -85,7 +85,7 @@ class UserController extends Controller
             'status' => true,
             'message' => 'User berhasil diperbarui',
             'data' => $user
-        ], 200);
+        ]);
     }
 
     /**
