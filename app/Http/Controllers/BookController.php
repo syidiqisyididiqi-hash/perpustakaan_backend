@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Book;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class BookController extends Controller
@@ -15,44 +16,31 @@ class BookController extends Controller
      */
     public function index()
     {
+        $books = Book::with('category')
+            ->select('id', 'category_id', 'isbn', 'title', 'author', 'publisher', 'published_year', 'stock', 'rack_code', 'cover', 'created_at')
+            ->latest()
+            ->get();
+
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => Book::with('category')
-                ->select(
-                    'id',
-                    'category_id',
-                    'isbn',
-                    'title',
-                    'author',
-                    'publisher',
-                    'published_year',
-                    'stock',
-                    'rack_code',
-                    'cover',
-                    'created_at'
-                )
-                ->latest()
-                ->get()
+            'data' => $books
         ], 200);
     }
 
     /**
-     * Dropdown data for books with stock > 0
+     * Dropdown data for books 
      */
     public function dropdown()
     {
+        $books = Book::select('id', 'title', 'rack_code', 'stock')
+            ->where('stock', '>', 0)
+            ->orderBy('title')
+            ->get();
+
         return response()->json([
             'status' => true,
-            'data' => Book::select(
-                'id',
-                'title',
-                'rack_code',
-                'stock'
-            )
-                ->where('stock', '>', 0)
-                ->orderBy('title')
-                ->get()
+            'data' => $books
         ]);
     }
 
@@ -70,13 +58,12 @@ class BookController extends Controller
             'published_year' => 'required|integer',
             'stock' => 'required|integer|min:0',
             'rack_code' => 'required|string|max:20',
-            'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
+            'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048'
         ]);
 
         if ($request->hasFile('cover')) {
             $validated['cover'] = $request->file('cover')->store('covers', 'public');
         }
-
 
         $book = Book::create($validated);
 
@@ -85,7 +72,6 @@ class BookController extends Controller
             'message' => 'Data berhasil ditambahkan',
             'data' => $book->load('category')
         ], 201);
-
     }
 
     /**
@@ -98,14 +84,6 @@ class BookController extends Controller
             'message' => 'Data berhasil diambil',
             'data' => $book->load('category')
         ], 200);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
     }
 
     /**
@@ -127,14 +105,13 @@ class BookController extends Controller
             'published_year' => 'sometimes|integer',
             'stock' => 'sometimes|integer|min:0',
             'rack_code' => 'sometimes|string|max:20',
-            'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048'
+            'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,webp|max:2048'
         ]);
 
         if ($request->hasFile('cover')) {
             if ($book->cover) {
                 Storage::disk('public')->delete($book->cover);
             }
-
             $validated['cover'] = $request->file('cover')->store('covers', 'public');
         }
 
@@ -152,16 +129,16 @@ class BookController extends Controller
      */
     public function destroy(Book $book)
     {
-        if ($book->cover) {
-            Storage::disk('public')->delete($book->cover);
-        }
-
-        $book->delete();
+        DB::transaction(function () use ($book) {
+            if ($book->cover) {
+                Storage::disk('public')->delete($book->cover);
+            }
+            $book->delete();
+        });
 
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil dihapus',
-            'data' => $book
         ], 200);
     }
 }

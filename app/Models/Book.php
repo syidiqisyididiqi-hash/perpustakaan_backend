@@ -21,10 +21,18 @@ class Book extends Model
         'cover'
     ];
 
-
     public function category()
     {
         return $this->belongsTo(Category::class);
     }
 
+    public function getStatusAttribute()
+    {
+        return $this->stock > 0 ? 'Available' : 'Out of Stock';
+    }
+
+    public function getCoverUrlAttribute()
+    {
+        return $this->cover ? asset('storage/' . $this->cover) : null;
+    }
 }

@@ -18,7 +18,7 @@ return new class extends Migration {
             $table->string('author', 100);
             $table->string('publisher', 100);
             $table->year('published_year');
-            $table->integer('stock');
+            $table->unsignedInteger('stock');
             $table->string('rack_code', 20);
             $table->string('cover', 255)->nullable();
             $table->timestamps();
