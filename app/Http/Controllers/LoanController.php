@@ -6,12 +6,13 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use App\Models\Book;
 use App\Models\Loan;
+use App\Models\LoanDetail;
 use Illuminate\Http\Request;
 
 class LoanController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * Display a listing of the loans
      */
     public function index()
     {
@@ -23,7 +24,7 @@ class LoanController extends Controller
     }
 
     /**
-     * Store a newly created resource in storage.
+     * Store a newly created loan in storage
      */
     public function store(Request $request)
     {
@@ -31,51 +32,47 @@ class LoanController extends Controller
             'user_id' => 'required|exists:users,id',
             'loan_date' => 'required|date',
             'due_date' => 'required|date|after_or_equal:loan_date',
-            'details' => 'required|array',
+            'details' => 'required|array|min:1',
             'details.*.book_id' => 'required|exists:books,id',
-            'details.*.qty' => 'required|integer|min:1'
+            'details.*.qty' => 'required|integer|min:1',
         ]);
 
-        try {
-            return DB::transaction(function () use ($request) {
+        return DB::transaction(function () use ($request) {
 
-                $loan = Loan::create([
-                    'user_id' => $request->user_id,
-                    'loan_date' => $request->loan_date,
-                    'due_date' => $request->due_date,
-                    'status' => 'borrowed'
-                ]);
+            $loan = Loan::create([
+                'user_id' => $request->user_id,
+                'loan_date' => $request->loan_date,
+                'due_date' => $request->due_date,
+                'status' => 'borrowed'
+            ]);
 
-                foreach ($request->details as $detail) {
+            foreach ($request->details as $detail) {
 
-                    $book = Book::lockForUpdate()->findOrFail($detail['book_id']);
+                $book = Book::lockForUpdate()->findOrFail($detail['book_id']);
 
-                    if ($book->stock < $detail['qty']) {
-                        throw new \Exception("Stok buku '{$book->title}' tidak mencukupi. Sisa stok: {$book->stock}");
-                    }
-
-                    $book->decrement('stock', $detail['qty']);
-
-                    $loan->loanDetails()->create($detail);
+                if ($book->stock < $detail['qty']) {
+                    throw new \Exception("Stok buku '{$book->title}' tidak mencukupi.");
                 }
 
-                return response()->json([
-                    'status' => true,
-                    'message' => 'Data ditambahkan & stok berkurang',
-                    'data' => $loan->load(['user', 'loanDetails.book'])
-                ], 201);
-            });
+                $book->decrement('stock', $detail['qty']);
 
-        } catch (\Exception $e) {
+                $loan->loanDetails()->create([
+                    'book_id' => $detail['book_id'],
+                    'qty' => $detail['qty'],
+                    'rack_code' => $book->rack_code, 
+                ]);
+            }
+
             return response()->json([
-                'status' => false,
-                'message' => $e->getMessage()
-            ], 400);
-        }
+                'status' => true,
+                'message' => 'Pinjaman berhasil dibuat',
+                'data' => $loan->load(['user', 'loanDetails.book'])
+            ], 201);
+        });
     }
 
     /**
-     * Display the specified resource.
+     * Display the specified loan with details
      */
     public function show(Loan $loan)
     {
@@ -87,39 +84,52 @@ class LoanController extends Controller
     }
 
     /**
-     * Update the specified resource in storage.
+     * Update the specified loan in storage
      */
     public function update(Request $request, Loan $loan)
     {
         $request->validate([
             'user_id' => 'sometimes|exists:users,id',
-            'due_date' => 'sometimes|date',
-            'return_date' => 'nullable|date'
+            'due_date' => 'sometimes|date'
         ]);
 
-        return DB::transaction(function () use ($request, $loan) {
+        $loan->update($request->only(['user_id', 'due_date']));
 
-            $loan->load('loanDetails.book');
+        return response()->json([
+            'status' => true,
+            'message' => 'Data berhasil diupdate',
+            'data' => $loan->load(['user', 'loanDetails.book'])
+        ], 200);
+    }
 
-            if ($request->return_date && !$loan->return_date) {
+    /**
+     * Return a specific book (partial return)
+     */
+    public function returnBook(LoanDetail $detail)
+    {
+        return DB::transaction(function () use ($detail) {
 
-                foreach ($loan->loanDetails as $detail) {
-                    $detail->book->increment('stock', $detail->qty);
-                }
+            if ($detail->returned_at) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Buku sudah dikembalikan'
+                ], 400);
             }
 
-            $loan->update([
-                'user_id' => $request->user_id ?? $loan->user_id,
-                'due_date' => $request->due_date ?? $loan->due_date,
-                'return_date' => $request->return_date,
-                'status' => $request->return_date ? 'returned' : 'borrowed'
-            ]);
+            $book = Book::lockForUpdate()->find($detail->book_id);
+            $book->increment('stock', $detail->qty);
+
+            $detail->update(['returned_at' => now()]);
+
+            $loan = $detail->loan;
+            if (!$loan->loanDetails()->whereNull('returned_at')->exists()) {
+                $loan->update(['status' => 'returned']);
+            }
 
             return response()->json([
                 'status' => true,
-                'message' => 'Data berhasil diupdate',
-                'data' => $loan->load(['user', 'loanDetails.book'])
-            ], 200);
+                'message' => 'Buku berhasil dikembalikan'
+            ]);
         });
     }
 
@@ -129,12 +139,13 @@ class LoanController extends Controller
     public function destroy(Loan $loan)
     {
         return DB::transaction(function () use ($loan) {
+
             $loan->load('loanDetails.book');
 
-            if ($loan->status !== 'returned') {
-
-                foreach ($loan->loanDetails as $detail) {
-                    $detail->book->increment('stock', $detail->qty);
+            foreach ($loan->loanDetails as $detail) {
+                if (!$detail->returned_at) {
+                    $book = Book::lockForUpdate()->find($detail->book_id);
+                    $book->increment('stock', $detail->qty);
                 }
             }
 

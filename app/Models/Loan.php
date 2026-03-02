@@ -8,29 +8,30 @@ use Illuminate\Database\Eloquent\Model;
 class Loan extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'user_id',
         'loan_date',
         'due_date',
-        'return_date',
         'status'
     ];
 
     protected $casts = [
         'loan_date' => 'date',
         'due_date' => 'date',
-        'return_date' => 'date',
     ];
+
 
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    public function isOverdue(): bool
+    public function loanDetails()
     {
-        return is_null($this->return_date) && now()->gt($this->due_date);
+        return $this->hasMany(LoanDetail::class);
     }
+
 
     public function scopeBorrowed($query)
     {
@@ -41,8 +42,15 @@ class Loan extends Model
     {
         return $query->where('status', 'returned');
     }
-    public function loanDetails()
+
+
+    public function isOverdue(): bool
     {
-        return $this->hasMany(LoanDetail::class);
+        return now()->gt($this->due_date)
+            && $this->loanDetails()->whereNull('returned_at')->exists();
+    }
+    public function isFullyReturned(): bool
+    {
+        return !$this->loanDetails()->whereNull('returned_at')->exists();
     }
 }

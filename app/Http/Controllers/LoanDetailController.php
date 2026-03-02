@@ -30,7 +30,7 @@ class LoanDetailController extends Controller
         $validated = $request->validate([
             'loan_id' => 'required|exists:loans,id',
             'book_id' => 'required|exists:books,id',
-            'qty' => 'required|integer|min:1'
+            'qty' => 'required|integer|min:1',
         ]);
 
         return DB::transaction(function () use ($validated) {
@@ -46,7 +46,12 @@ class LoanDetailController extends Controller
 
             $book->decrement('stock', $validated['qty']);
 
-            $loanDetail = LoanDetail::create($validated);
+            $loanDetail = LoanDetail::create([
+                'loan_id' => $validated['loan_id'],
+                'book_id' => $validated['book_id'],
+                'qty' => $validated['qty'],
+                'rack_code' => $book->rack_code,
+            ]);
 
             return response()->json([
                 'status' => true,
@@ -76,56 +81,52 @@ class LoanDetailController extends Controller
         $validated = $request->validate([
             'loan_id' => 'sometimes|exists:loans,id',
             'book_id' => 'sometimes|exists:books,id',
-            'qty' => 'sometimes|integer|min:1'
+            'qty' => 'sometimes|integer|min:1',
         ]);
 
-        try {
-            return DB::transaction(function () use ($validated, $loanDetail) {
+        return DB::transaction(function () use ($validated, $loanDetail) {
 
-                if (isset($validated['book_id']) && $validated['book_id'] != $loanDetail->book_id) {
+            if (isset($validated['book_id']) && $validated['book_id'] != $loanDetail->book_id) {
+                $loanDetail->book()->increment('stock', $loanDetail->qty);
+                $newBook = Book::lockForUpdate()->findOrFail($validated['book_id']);
+                $newQty = $validated['qty'] ?? $loanDetail->qty;
 
-                    $loanDetail->book()->increment('stock', $loanDetail->qty);
-
-                    $newBook = Book::lockForUpdate()->findOrFail($validated['book_id']);
-
-                    $newQty = $validated['qty'] ?? $loanDetail->qty;
-
-                    if ($newBook->stock < $newQty) {
-                        throw new \Exception("Stok buku baru tidak mencukupi");
-                    }
-
-                    $newBook->decrement('stock', $newQty);
-                } elseif (isset($validated['qty']) && $validated['qty'] != $loanDetail->qty) {
-
-                    $book = Book::lockForUpdate()->findOrFail($loanDetail->book_id);
-
-                    $selisih = $validated['qty'] - $loanDetail->qty;
-
-                    if ($selisih > 0) {
-                        if ($book->stock < $selisih) {
-                            throw new \Exception("Stok tidak mencukupi");
-                        }
-                        $book->decrement('stock', $selisih);
-                    } else {
-                        $book->increment('stock', abs($selisih));
-                    }
+                if ($newBook->stock < $newQty) {
+                    return response()->json([
+                        'status' => false,
+                        'message' => 'Stok buku baru tidak mencukupi'
+                    ], 400);
                 }
 
-                $loanDetail->update($validated);
+                $newBook->decrement('stock', $newQty);
 
-                return response()->json([
-                    'status' => true,
-                    'message' => 'Detail berhasil diupdate',
-                    'data' => $loanDetail->load(['loan', 'book'])
-                ]);
-            });
+                $validated['rack_code'] = $newBook->rack_code;
+            } elseif (isset($validated['qty']) && $validated['qty'] != $loanDetail->qty) {
+                $book = Book::lockForUpdate()->findOrFail($loanDetail->book_id);
 
-        } catch (\Exception $e) {
+                $diff = $validated['qty'] - $loanDetail->qty;
+
+                if ($diff > 0) {
+                    if ($book->stock < $diff) {
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'Stok tidak mencukupi'
+                        ], 400);
+                    }
+                    $book->decrement('stock', $diff);
+                } else {
+                    $book->increment('stock', abs($diff));
+                }
+            }
+
+            $loanDetail->update($validated);
+
             return response()->json([
-                'status' => false,
-                'message' => $e->getMessage()
-            ], 400);
-        }
+                'status' => true,
+                'message' => 'Detail berhasil diupdate',
+                'data' => $loanDetail->load(['loan', 'book'])
+            ]);
+        });
     }
 
     /**
@@ -146,7 +147,7 @@ class LoanDetailController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'Data detail dihapus & stok dikembalikan',
-            ], 200);
+            ]);
         });
     }
 }

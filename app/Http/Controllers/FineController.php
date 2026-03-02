@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Fine;
+use App\Models\LoanDetail;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class FineController extends Controller
 {
@@ -13,13 +15,23 @@ class FineController extends Controller
      */
     public function index()
     {
+        $fines = Fine::with([
+            'loanDetail.loan.user',
+            'loanDetail.book'
+        ])->latest()->paginate(10);
+
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => Fine::with(['loan'])->latest()->get()
-        ], 200);
+            'data' => $fines->items(),
+            'pagination' => [
+                'current_page' => $fines->currentPage(),
+                'last_page' => $fines->lastPage(),
+                'per_page' => $fines->perPage(),
+                'total' => $fines->total(),
+            ]
+        ]);
     }
-
 
     /**
      * Store a newly created resource in storage.
@@ -27,41 +39,66 @@ class FineController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'loan_id' => 'required|exists:loans,id',
-            'overdue_days' => 'required|integer|min:0',
-            'status' => 'required|in:paid,unpaid',
-            'total_fine' => 'nullable|numeric'
+            'loan_detail_id' => 'required|exists:loan_details,id',
+            'status' => 'required|in:paid,unpaid'
         ]);
 
-        $loan = \App\Models\Loan::with('loanDetails.book')->findOrFail($validated['loan_id']);
+        $loanDetail = LoanDetail::with('loan.user', 'book')->findOrFail($validated['loan_detail_id']);
 
-        $rackCode = $loan->loanDetails->first()?->book?->rack_code ?? '-';
-
-        $amount = $validated['total_fine'] ?? 0;
-
-        if (!$amount) {
-            $today = now();
-            $returnDate = \Carbon\Carbon::parse($loan->return_date);
-
-            if ($today->greaterThan($returnDate)) {
-                $daysLate = $returnDate->diffInDays($today);
-                $amount = $daysLate * 5000;
-            }
+        if (Fine::where('loan_detail_id', $loanDetail->id)->exists()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Denda sudah pernah dibuat'
+            ], 422);
         }
 
-        $fine = \App\Models\Fine::create([
-            'loan_id' => $validated['loan_id'],
-            'rack_code' => $rackCode,
-            'overdue_days' => $validated['overdue_days'],
-            'total_fine' => $amount,
-            'status' => $validated['status'],
-        ]);
+        if (!$loanDetail->returned_at) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Buku belum dikembalikan'
+            ], 422);
+        }
 
-        return response()->json([
-            'status' => true,
-            'message' => 'Denda berhasil dibuat',
-            'data' => $fine->load('loan.user')
-        ]);
+        $returnDate = Carbon::parse($loanDetail->returned_at);
+        $dueDate = Carbon::parse($loanDetail->loan->due_date);
+
+        if ($returnDate->lte($dueDate)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Buku tidak terlambat'
+            ], 422);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $daysLate = $dueDate->diffInDays($returnDate);
+            $dailyRate = 5000;
+            $total = $daysLate * $dailyRate;
+
+            $fine = Fine::create([
+                'loan_detail_id' => $loanDetail->id,
+                'overdue_days' => $daysLate,
+                'daily_rate' => $dailyRate,
+                'total_fine' => $total,
+                'status' => $validated['status'],
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Denda berhasil dibuat',
+                'data' => $fine->load('loanDetail.loan.user', 'loanDetail.book')
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => false,
+                'message' => 'Gagal membuat denda: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
@@ -69,13 +106,17 @@ class FineController extends Controller
      */
     public function show(Fine $fine)
     {
+        $fine->load([
+            'loanDetail.book',
+            'loanDetail.loan.user'
+        ]);
+
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => $fine->load(['loan'])
-        ], 200);
+            'data' => $fine
+        ]);
     }
-
 
     /**
      * Update the specified resource in storage.
@@ -83,21 +124,19 @@ class FineController extends Controller
     public function update(Request $request, Fine $fine)
     {
         $validated = $request->validate([
-            'overdue_days' => 'sometimes|integer|min:1',
-            'status' => 'sometimes|in:paid,unpaid',
+            'status' => 'required|in:paid,unpaid'
         ]);
 
         $fine->update([
-            'overdue_days' => $validated['overdue_days'],
             'status' => $validated['status'],
+            'paid_at' => $validated['status'] === 'paid' ? now() : null
         ]);
 
         return response()->json([
             'status' => true,
-            'message' => 'Data berhasil diupdate',
-            'data' => $fine->load(['loan'])
-        ], 200);
-
+            'message' => 'Status denda berhasil diupdate',
+            'data' => $fine->load('loanDetail.loan.user', 'loanDetail.book')
+        ]);
     }
 
     /**
@@ -109,8 +148,7 @@ class FineController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Data berhasil dihapus',
-            'data' => $fine
-        ], 200);
+            'message' => 'Data berhasil dihapus'
+        ]);
     }
 }

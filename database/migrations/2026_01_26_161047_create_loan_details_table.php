@@ -11,11 +11,16 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('loan_details', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('loan_id')->constrained('loans')->cascadeOnDelete();
-            $table->foreignId('book_id')->constrained('books')->cascadeOnDelete();
+            $table->id(); 
+            $table->foreignId('loan_id')
+                ->constrained('loans')
+                ->cascadeOnDelete();
+            $table->foreignId('book_id')
+                ->constrained('books')
+                ->cascadeOnDelete();
             $table->string('rack_code', 20);
-            $table->integer('qty');
+            $table->unsignedInteger('qty')->default(1);
+            $table->timestamp('returned_at')->nullable();
             $table->timestamps();
         });
     }

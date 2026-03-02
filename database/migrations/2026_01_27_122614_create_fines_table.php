@@ -12,12 +12,18 @@ return new class extends Migration {
     {
         Schema::create('fines', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('loan_id')->constrained('loans')->cascadeOnDelete();
-            $table->string('rack_code');
-            $table->unsignedInteger('overdue_days');
-            $table->decimal('total_fine', 10, 2);
-            $table->enum('status', ['paid', 'unpaid'])->default('unpaid');
+
+            
+            $table->foreignId('loan_detail_id')
+                ->constrained('loan_details')
+                ->cascadeOnDelete();
+            $table->unsignedInteger('overdue_days')->default(0);
+            $table->decimal('daily_rate', 10, 2)->default(5000);
+            $table->decimal('total_fine', 12, 2)->default(0);
+            $table->enum('status', ['unpaid', 'paid'])->default('unpaid');
+            $table->timestamp('paid_at')->nullable();
             $table->timestamps();
+            $table->unique('loan_detail_id');
         });
     }
 
