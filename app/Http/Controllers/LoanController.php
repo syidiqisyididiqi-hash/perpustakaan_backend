@@ -8,6 +8,8 @@ use App\Models\Book;
 use App\Models\Loan;
 use App\Models\LoanDetail;
 use Illuminate\Http\Request;
+use Carbon\Carbon;
+use App\Models\Fine;
 
 class LoanController extends Controller
 {
@@ -59,7 +61,7 @@ class LoanController extends Controller
                 $loan->loanDetails()->create([
                     'book_id' => $detail['book_id'],
                     'qty' => $detail['qty'],
-                    'rack_code' => $book->rack_code, 
+                    'rack_code' => $book->rack_code,
                 ]);
             }
 
@@ -90,10 +92,53 @@ class LoanController extends Controller
     {
         $request->validate([
             'user_id' => 'sometimes|exists:users,id',
-            'due_date' => 'sometimes|date'
+            'due_date' => 'sometimes|date',
+            'return_date' => 'sometimes|date'
         ]);
 
-        $loan->update($request->only(['user_id', 'due_date']));
+        DB::transaction(function () use ($request, $loan) {
+
+            $loan->update($request->only(['user_id', 'due_date']));
+
+            if ($request->has('return_date')) {
+
+                $returnDate = Carbon::parse($request->return_date);
+                $dueDate = Carbon::parse($loan->due_date);
+
+                foreach ($loan->loanDetails as $detail) {
+
+                    if (!$detail->returned_at) {
+
+                        $book = Book::lockForUpdate()->find($detail->book_id);
+                        $book->increment('stock', $detail->qty);
+
+                        $detail->update([
+                            'returned_at' => $request->return_date
+                        ]);
+
+                        if ($returnDate->gt($dueDate)) {
+
+                            if (!Fine::where('loan_detail_id', $detail->id)->exists()) {
+
+                                $daysLate = $dueDate->diffInDays($returnDate);
+                                $dailyRate = 5000;
+
+                                Fine::create([
+                                    'loan_detail_id' => $detail->id,
+                                    'overdue_days' => $daysLate,
+                                    'daily_rate' => $dailyRate,
+                                    'total_fine' => $daysLate * $dailyRate,
+                                    'status' => 'unpaid'
+                                ]);
+                            }
+                        }
+                    }
+                }
+
+                $loan->update(['status' => 'returned']);
+            }
+
+        });
 
         return response()->json([
             'status' => true,
