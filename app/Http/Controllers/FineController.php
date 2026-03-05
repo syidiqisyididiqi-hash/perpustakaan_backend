@@ -20,10 +20,15 @@ class FineController extends Controller
             'loanDetail.book'
         ])->latest()->paginate(10);
 
+        $data = collect($fines->items())->map(function ($fine) {
+            $fine->total_fine = (int) $fine->total_fine;
+            return $fine;
+        });
+
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => $fines->items(),
+            'data' => $data,
             'pagination' => [
                 'current_page' => $fines->currentPage(),
                 'last_page' => $fines->lastPage(),
@@ -43,7 +48,8 @@ class FineController extends Controller
             'status' => 'required|in:paid,unpaid'
         ]);
 
-        $loanDetail = LoanDetail::with('loan.user', 'book')->findOrFail($validated['loan_detail_id']);
+        $loanDetail = LoanDetail::with('loan.user', 'book')
+            ->findOrFail($validated['loan_detail_id']);
 
         if (Fine::where('loan_detail_id', $loanDetail->id)->exists()) {
             return response()->json([
@@ -72,9 +78,11 @@ class FineController extends Controller
         DB::beginTransaction();
 
         try {
+
             $daysLate = $dueDate->diffInDays($returnDate);
             $dailyRate = 5000;
-            $total = $daysLate * $dailyRate;
+
+            $total = (int) ($daysLate * $dailyRate);
 
             $fine = Fine::create([
                 'loan_detail_id' => $loanDetail->id,
@@ -86,6 +94,8 @@ class FineController extends Controller
 
             DB::commit();
 
+            $fine->total_fine = (int) $fine->total_fine;
+
             return response()->json([
                 'status' => true,
                 'message' => 'Denda berhasil dibuat',
@@ -93,7 +103,9 @@ class FineController extends Controller
             ], 201);
 
         } catch (\Exception $e) {
+
             DB::rollBack();
+
             return response()->json([
                 'status' => false,
                 'message' => 'Gagal membuat denda: ' . $e->getMessage()
@@ -110,6 +122,8 @@ class FineController extends Controller
             'loanDetail.book',
             'loanDetail.loan.user'
         ]);
+
+        $fine->total_fine = (int) $fine->total_fine;
 
         return response()->json([
             'status' => true,
@@ -131,6 +145,8 @@ class FineController extends Controller
             'status' => $validated['status'],
             'paid_at' => $validated['status'] === 'paid' ? now() : null
         ]);
+
+        $fine->total_fine = (int) $fine->total_fine;
 
         return response()->json([
             'status' => true,
