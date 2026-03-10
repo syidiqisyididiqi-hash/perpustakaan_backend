@@ -4,18 +4,19 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 
 class ApiAuthController extends Controller
 {
-    // Register
+    /**
+     * Register User
+     */
     public function register(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:6|confirmed'
         ]);
 
@@ -29,12 +30,15 @@ class ApiAuthController extends Controller
 
         return response()->json([
             'message' => 'Register berhasil',
+            'user' => $user,
             'access_token' => $token,
             'token_type' => 'Bearer'
         ], 201);
     }
 
-    // Login
+    /**
+     * Login User
+     */
     public function login(Request $request)
     {
         $request->validate([
@@ -42,24 +46,27 @@ class ApiAuthController extends Controller
             'password' => 'required|string'
         ]);
 
-        if (!Auth::attempt($request->only('email', 'password'))) {
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'Login gagal, email atau password salah'
+                'message' => 'Email atau password salah'
             ], 401);
         }
-
-        $user = User::where('email', $request->email)->firstOrFail();
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'message' => 'Login berhasil',
+            'user' => $user,
             'access_token' => $token,
             'token_type' => 'Bearer'
         ]);
     }
 
-    // Logout
+    /**
+     * Logout User
+     */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
