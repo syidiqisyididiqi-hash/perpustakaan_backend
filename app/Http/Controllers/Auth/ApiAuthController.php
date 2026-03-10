@@ -9,20 +9,19 @@ use Illuminate\Support\Facades\Hash;
 
 class ApiAuthController extends Controller
 {
-    /**
-     * Register User
-     */
     public function register(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
+            'role' => 'required|in:admin,member',
             'password' => 'required|string|min:6|confirmed'
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
+            'role' => $request->role,
             'password' => Hash::make($request->password)
         ]);
 
@@ -36,9 +35,6 @@ class ApiAuthController extends Controller
         ], 201);
     }
 
-    /**
-     * Login User
-     */
     public function login(Request $request)
     {
         $request->validate([
@@ -64,9 +60,6 @@ class ApiAuthController extends Controller
         ]);
     }
 
-    /**
-     * Logout User
-     */
     public function logout(Request $request)
     {
         $request->user()->currentAccessToken()->delete();
