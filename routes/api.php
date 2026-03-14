@@ -8,6 +8,8 @@ use App\Http\Controllers\FineController;
 use App\Http\Controllers\LoanController;
 use App\Http\Controllers\LoanDetailController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\ProfileController;
+
 
 Route::prefix('auth')->group(function () {
     Route::post('register', [ApiAuthController::class, 'register']);
@@ -24,10 +26,14 @@ Route::get('health', function () {
 
 Route::middleware('auth:sanctum')->group(function () {
 
+    Route::get('/profile', [ProfileController::class, 'show']);
+    Route::put('/profile', [ProfileController::class, 'update']);
+
     Route::apiResource('users', UserController::class);
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('books', BookController::class);
-    Route::apiResource('fines', FineController::class);
+    Route::get('/books-dropdown', [BookController::class, 'dropdown']);
     Route::apiResource('loans', LoanController::class);
+    Route::apiResource('fines', FineController::class);
     Route::apiResource('loan-details', LoanDetailController::class);
 });
