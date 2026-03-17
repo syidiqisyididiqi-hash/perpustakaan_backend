@@ -34,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('books', BookController::class);
     Route::get('/books-dropdown', [BookController::class, 'dropdown']);
     Route::apiResource('loans', LoanController::class);
+    Route::get('/my-loans', [LoanController::class, 'myLoans']);
     Route::apiResource('fines', FineController::class);
     Route::apiResource('loan-details', LoanDetailController::class);
 });

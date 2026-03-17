@@ -21,7 +21,11 @@ class LoanController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => Loan::with(['user', 'loanDetails.book'])->latest()->get()
+            'data' => Loan::with([
+                'user',
+                'loanDetails.book',
+                'loanDetails.fine'
+            ])->latest()->get()
         ], 200);
     }
 
@@ -68,7 +72,11 @@ class LoanController extends Controller
             return response()->json([
                 'status' => true,
                 'message' => 'Pinjaman berhasil dibuat',
-                'data' => $loan->load(['user', 'loanDetails.book'])
+                'data' => $loan->load([
+                    'user',
+                    'loanDetails.book',
+                    'loanDetails.fine'
+                ])
             ], 201);
         });
     }
@@ -81,7 +89,11 @@ class LoanController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diambil',
-            'data' => $loan->load(['user', 'loanDetails.book'])
+            'data' => $loan->load([
+                'user',
+                'loanDetails.book',
+                'loanDetails.fine'
+            ])
         ], 200);
     }
 
@@ -143,7 +155,11 @@ class LoanController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Data berhasil diupdate',
-            'data' => $loan->load(['user', 'loanDetails.book'])
+            'data' => $loan->load([
+                'user',
+                'loanDetails.book',
+                'loanDetails.fine'
+            ])
         ], 200);
     }
 
@@ -202,4 +218,46 @@ class LoanController extends Controller
             ], 200);
         });
     }
-}
+
+    public function historyByUser($userId)
+    {
+        $loans = Loan::with([
+            'loanDetails.book',
+            'loanDetails.fine'
+        ])
+            ->where('user_id', $userId)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'History peminjaman user berhasil diambil',
+            'data' => $loans
+        ], 200);
+    }
+
+    public function myLoans(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Unauthorized'
+            ], 401);
+        }
+
+        $loans = Loan::with([
+            'loanDetails.book',
+            'loanDetails.fine'
+        ])
+            ->where('user_id', $user->id)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data' => $loans
+        ]);
+    }
+} 
