@@ -255,9 +255,37 @@ class LoanController extends Controller
             ->latest()
             ->get();
 
+        $data = $loans->map(function ($loan) {
+
+            return [
+                'id' => $loan->id,
+                'loan_date' => $loan->loan_date,
+                'due_date' => $loan->due_date,
+                'status' => $loan->status,
+
+                'loan_details' => $loan->loanDetails->map(function ($detail) {
+
+                    return [
+                        'id' => $detail->id,
+                        'book' => [
+                            'title' => $detail->book->title ?? '-'
+                        ],
+                        'rack_code' => $detail->rack_code,
+                        'returned_at' => $detail->returned_at,
+
+                        // 🔥 FINE DATA
+                        'fine_id' => $detail->fine->id ?? null,
+                        'fine_total' => (int) ($detail->fine->total_fine ?? 0),
+                        'fine_status' => $detail->fine->status ?? null,
+                        'overdue_days' => (int) ($detail->fine->overdue_days ?? 0),
+                    ];
+                })
+            ];
+        });
+
         return response()->json([
             'status' => true,
-            'data' => $loans
+            'data' => $data
         ]);
     }
-} 
+}
