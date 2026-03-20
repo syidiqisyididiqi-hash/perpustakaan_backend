@@ -23,6 +23,7 @@ Route::get('health', function () {
         'message' => 'API up'
     ], 200);
 });
+Route::get('/public/books', [BookController::class, 'publicBooks']);
 
 Route::middleware('auth:sanctum')->group(function () {
 

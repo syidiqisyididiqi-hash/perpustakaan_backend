@@ -141,4 +141,11 @@ class BookController extends Controller
             'message' => 'Data berhasil dihapus',
         ], 200);
     }
+
+    public function publicBooks()
+    {
+        return response()->json(
+            Book::latest()->take(5)->get()
+        );
+    }
 }
