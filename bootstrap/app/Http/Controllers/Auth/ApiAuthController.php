@@ -14,20 +14,13 @@ class ApiAuthController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:6|confirmed',
-            'role' => 'nullable|in:member,admin' 
+            'password' => 'required|string|min:6|confirmed'
         ]);
-
-        $role = 'member';
-
-        if ($request->role === 'admin') {
-            $role = 'admin';
-        }
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'role' => $role, 
+            'role' => 'member',
             'password' => Hash::make($request->password)
         ]);
 
