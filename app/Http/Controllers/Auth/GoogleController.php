@@ -48,11 +48,8 @@ class GoogleController extends Controller
             }
 
             Auth::login($authUser);
-
-            // Buat token Sanctum
             $token = $authUser->createToken('auth_token')->plainTextToken;
 
-            // Redirect sambil bawa token di URL supaya ditangkap localStorage di Frontend
             return redirect()->away("http://localhost:3000/member?token={$token}");
 
         } catch (Exception $e) {
